@@ -106,7 +106,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.gpu is not None:
         print('use gpu: {} for training'.format(args.gpu))
 
-    if 
+    if args.distributed:
 
 
 if __name__ == '__main__':
