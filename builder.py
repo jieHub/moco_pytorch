@@ -18,7 +18,7 @@ class MoCo(nn.Module):
             self.encoder_q.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), self.encoder_q.fc)
             self.encoder_k.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), self.encoder_k.fc)
 
-        for param_q, param_k in zip(self.encoder_q.parameters(), delf.encoder_k.parameters()):
+        for param_q, param_k in zip(self.encoder_q.parameters(), self.encoder_k.parameters()):
             param_k.data.copy_(param_q.data)
             param_k.requires_grad = False
 
@@ -38,7 +38,7 @@ class MoCo(nn.Module):
 
         batch_size = keys.shape[0]
 
-        ptr = int(slef.queue_ptr)
+        ptr = int(self.queue_ptr)
         assert self.K % batch_size == 0
 
         self.queue[:, ptr: ptr + batch_size] = keys.T
@@ -58,7 +58,7 @@ class MoCo(nn.Module):
 
         torch.distributed.broadcast(idx_shuffle, src=0)
 
-        idx_unshuffle = torch.argsort(idf_shuffle)
+        idx_unshuffle = torch.argsort(idx_shuffle)
 
         gpu_idx = torch.distributed.get_rank()
         idx_this = idx_shuffle.view(num_gpus, -1)[gpu_idx]
@@ -78,7 +78,7 @@ class MoCo(nn.Module):
 
         return x_gather[idx_this]
 
-    def forward(self, imq, im_k):
+    def forward(self, im_q, im_k):
         q = self.encoder_q(im_q)
         q = nn.functional.normalize(q, dim=1)
 
@@ -107,7 +107,7 @@ class MoCo(nn.Module):
 @torch.no_grad()
 def concat_all_gather(tensor):
     tensors_gather = [torch.ones_like(tensor) for _ in range(torch.distributed.get_world_size())]
-    torch.distributed.all_gather(tensors_gather, tensor, astnc_op=False)
+    torch.distributed.all_gather(tensors_gather, tensor, async_op=False)
 
     output = torch.cat(tensors_gather, dim=0)
     return output

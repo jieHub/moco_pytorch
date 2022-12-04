@@ -37,7 +37,7 @@ parser.add_argument('-b', '--batch-size', default=256, type=int, metavar='N',
              'batch size of all GPUs on the current node when '
              'using Data Parallel or Distributed Data Parallel')
 parser.add_argument('--lr', '--learning-rate', default=0.03, type=float, metavar='LR', help='initial learning rate', dest='lr')
-parser.add_argument('--shedule', default=[120, 160], nargs='*', type=int, help='learning rate schedule (when to drop lr by 10x)')
+parser.add_argument('--schedule', default=[120, 160], nargs='*', type=int, help='learning rate schedule (when to drop lr by 10x)')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M', help='momentum of SGD solver')
 parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float, metavar='W', help='weight decay (default: 1e-4)', dest='weight_decay')
 parser.add_argument('-p', '--print-freq', default=10, type=int, metavar='N', help='print frequency (default: 10)')
@@ -45,7 +45,7 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH', help='path
 parser.add_argument('--world-size', default=-1, type=int, help='number of nodes for distributed training')
 parser.add_argument('--rank', default=-1, type=int, help='node rank for distributed training')
 parser.add_argument('--dist-url', default='tcp://224.66.41.62:23456', type=str, help='url used to set up distributed training')
-psrser.add_argument('--dist-backend', default='nccl', type=str, help='distributed backend')
+parser.add_argument('--dist-backend', default='nccl', type=str, help='distributed backend')
 parser.add_argument('--seed', default=None, type=int, help='seed for initializing training')
 parser.add_argument('--gpu', default=None, type=int, help='GPU id to use.')
 parser.add_argument('--multiprocessing-distributed', action='store_true', 
@@ -96,7 +96,7 @@ def main():
         main_worker(args.gpu, ngpus_per_node, args)
 
 def main_worker(gpu, ngpus_per_node, args):
-    arg.gpu = gpu
+    args.gpu = gpu
 
     if args.multiprocessing_distributed and args.gpu != 0:
         def print_pass(*args):
@@ -115,7 +115,7 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
     # create model
     print("=> creating model '{}'".format(args.arch))
-    model = moco.builder.MoCo(
+    model = builder.MoCo(
         models.__dict__[args.arch],
         args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp)
     print(model)
@@ -187,7 +187,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
             ], p=0.8),
             transforms.RandomGrayscale(p=0.2),
-            transforms.RandomApply([moco.loader.GaussianBlur([.1, 2.])], p=0.5),
+            transforms.RandomApply([loader.GaussianBlur([.1, 2.])], p=0.5),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize
@@ -205,7 +205,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     train_dataset = datasets.ImageFolder(
         traindir,
-        moco.loader.TwoCropsTransform(transforms.Compose(augmentation)))
+        loader.TwoCropsTransform(transforms.Compose(augmentation)))
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
@@ -268,7 +268,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         batch_time.update(time.time() - end)
         end = time.time()
 
-        if i % args.print_frep == 0:
+        if i % args.print_freq == 0:
             progress.display(i)
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
@@ -291,7 +291,7 @@ class AverageMeter(object):
 
     def update(self, val, n=1):
         self.val = val
-        self.sum =+= val * n
+        self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
 
@@ -317,7 +317,7 @@ class ProgressMeter(object):
 
 def adjust_learning_rate(optimizer, epoch, args):
     lr = args.lr
-    if arhs.cos:
+    if args.cos:
         lr *= 0.5 * (1. + math.cos(math.pi * epoch / args.epochs))
     else:
         for milestone in args.schedule:
@@ -336,7 +336,7 @@ def accuracy(output, target, topk=(1,)):
 
     res = []
     for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
+        correct_k = correct[:k].contiguous().view(-1).float().sum(0, keepdim=True)
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
 
