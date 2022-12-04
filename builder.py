@@ -79,12 +79,30 @@ class MoCo(nn.Module):
         return x_gather[idx_this]
 
     def forward(self, imq, im_k):
+        q = self.encoder_q(im_q)
+        q = nn.functional.normalize(q, dim=1)
 
+        with torch.no_grad():
+            self._momentum_update_key_encoder()
 
+            im_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
 
-        
+            k = self.encoder_k(im_k)
+            k = nn.functional.normalize(k, dim=1)
 
+            k = self._batch_unshuffle_ddp(k, idx_unshuffle)
 
+        l_pos = torch.einsum('nc,nc->n', [q, k]).unsqueeze(-1)
+        l_neg = torch.einsum('nc,ck->nk', [q, self.queue.clone().detach()])
+
+        logits = torch.cat([l_pos, l_neg], dim=1)
+        logits /= self.T
+
+        labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda()
+
+        self._dequeue_and_enqueue(k)
+
+        return logits, labels
 
 @torch.no_grad()
 def concat_all_gather(tensor):
